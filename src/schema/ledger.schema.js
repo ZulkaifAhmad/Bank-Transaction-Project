@@ -46,8 +46,8 @@ ledgerSchema.pre("findOneAndUpdate", ledgerCanNotBeModified);
 ledgerSchema.pre("findOneAndReplace", ledgerCanNotBeModified);
 ledgerSchema.pre("updateMany", ledgerCanNotBeModified);
 ledgerSchema.pre("updateOne", ledgerCanNotBeModified);
+ledgerSchema.pre("remove", ledgerCanNotBeModified);
 
+const Ledger = mongoose.model("ledger", ledgerSchema);
 
-const Ledger = mongoose.model("ledger",ledgerSchema);
-
-export default Ledger
+export default Ledger;
