@@ -7,7 +7,7 @@ const status = {
   register: "register",
   logout: "logout",
 };
-
+ 
 async function Register(req, res) {
   try {
     const { name, email, password } = req.body;

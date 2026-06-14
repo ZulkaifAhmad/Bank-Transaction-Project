@@ -1,5 +1,8 @@
+import mongoose from "mongoose";
 import Account from "../schema/account.schema.js";
 import Transaction from "../schema/transaction.schema.js";
+import Ledger from "../schema/ledger.schema.js";
+import { SendTransactionEmail } from "../services/email.service.js";
 
 async function createTransaction(req, res) {
   try {
@@ -58,6 +61,83 @@ async function createTransaction(req, res) {
           message: "Your Transaction has been reversed",
         });
       }
+    }
+
+    const getUserBalance = await checkFromAccount.getBalance();
+
+    if (getUserBalance < amount) {
+      return res.status(400).json({
+        message: `insufficent Balance for this transaction. Current Balance : ${getUserBalance} , requested Amount : ${amount}`,
+      });
+    }
+
+    const session = await mongoose.startSession();
+
+    try {
+      session.startTransaction();
+
+      const transactionDoc = await Transaction.create(
+        {
+          fromAccount,
+          toAccount,
+          status: "PENDING",
+          amount,
+          idempotencyKey,
+        },
+
+        { session },
+      );
+
+      await Ledger.create(
+        [
+          {
+            account: toAccount,
+            amount,
+            transaction: transactionDoc[0]._id,
+            type: "CREDIT",
+          },
+          {
+            account: fromAccount,
+            amount,
+            transaction: transactionDoc[0]._id,
+            type: "DEBIT",
+          },
+        ],
+        { session, ordered: true },
+      );
+
+      await Transaction.updateOne(
+        { _id: transactionDoc._id },
+        { status: "COMPLETED" },
+        { session },
+      );
+
+      await session.commitTransaction();
+      const sendTransactionEmail = await SendTransactionEmail(
+        req.user.email,
+        req.user.name,
+        amount,
+        "success",
+        toAccount,
+      );
+      console.log(sendTransactionEmail);
+      res.status(201).json({
+        message: "transaction completed successfully",
+        "transaction Details": transactionDoc,
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      await SendTransactionEmail(
+        req.user.email,
+        req.user.name,
+        amount,
+        "failed",
+        null,
+        "Insufficient balance",
+      );
+      console.log(error);
+    } finally {
+      session.endSession();
     }
   } catch (error) {
     console.log(error);
