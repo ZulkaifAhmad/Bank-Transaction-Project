@@ -19,6 +19,12 @@ const userSchema = new mongoose.Schema({
         minlength : 6 ,
         require : true , 
         type : String ,
+    } ,
+    systemUser : {
+        type : Boolean ,
+        default : false ,
+        immutable : true,
+        select : false
     }
 }, {timestamps : true});
 

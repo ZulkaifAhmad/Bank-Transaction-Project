@@ -147,4 +147,96 @@ async function createTransaction(req, res) {
   }
 }
 
-export { createTransaction };
+async function createInitialFunds(req, res) {
+  const { toAccount, amount, idempotencyKey } = req.body;
+
+  if (!toAccount || !amount || !idempotencyKey) {
+    return res.json({
+      message: "toAccount , amount and idempotencykey not found",
+    });
+  }
+
+  const findToAccount = await Account.findOne({ _id: toAccount });
+
+  if (!findToAccount || findToAccount.status !== "ACTIVE") {
+    return res.status(403).json({
+      message: "Your Account not active || Invalid toAccount",
+    });
+  }
+
+  const findFromAccount = await Account.findOne({
+    // systemUser: true,
+    user: req.user.id,
+  });
+
+  if (!findFromAccount) {
+    console.log(findFromAccount)
+    return res.status(404).json({
+      message: "fromAccount or SystemUser Account not found",
+    });
+  }
+
+  // const existing = await Transaction.findOne({ idempotencyKey });
+  // if (existing) {
+  //   return res.status(400).json({
+  //     message: "Duplicate transaction request",
+  //   });
+  // }
+
+  const session = await mongoose.startSession();
+  try {
+    await session.startTransaction();
+
+    const [newTransaction] = await Transaction.create(
+      [
+        {
+          fromAccount: findFromAccount._id,
+          amount,
+          status: "PENDING",
+          toAccount,
+          idempotencyKey,
+        },
+      ],
+      { session },
+    );
+
+    const newLedger = await Ledger.create(
+      [
+        {
+          account: toAccount,
+          amount,
+          transaction: newTransaction._id,
+          type: "CREDIT",
+        },
+        {
+          account: findFromAccount._id,
+          amount,
+          transaction: newTransaction._id,
+          type: "DEBIT",
+        },
+      ],
+      { session, ordered: true },
+    );
+
+    await Transaction.updateOne(
+      { _id: newTransaction._id },
+      { status: "COMPLETED" },
+      { session },
+    );
+
+    await session.commitTransaction();
+
+    res.status(201).json({
+      message: "Transaction from systemAccount to userAccount has done",
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    res.status(500).json({
+      message: error,
+    });
+  } finally {
+    await session.endSession();
+  }
+}
+
+export { createTransaction, createInitialFunds };
