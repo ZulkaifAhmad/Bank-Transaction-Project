@@ -10,6 +10,12 @@ app.use(express.json());
 app.use(express.Router());
 app.use(cookieParser());
 
+app.use("/",(req , res) => {
+    res.status(200).json({
+        "message" : "Ledger Entry System is Running..."
+    })
+})
+
 app.use("/api/auth", router);
 app.use("/api/account", accountRouter);
 app.use("/api/transaction", TransactionRouter);
