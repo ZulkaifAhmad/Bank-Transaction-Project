@@ -1,7 +1,8 @@
 import jwt from "jsonwebtoken";
 import User from "../schema/user.schema.js";
+import BlockListToken from "../schema/blocklist.schema.js";
 
-function authUser(req, res, next) {
+async function authUser(req, res, next) {
   try {
     const token = req.cookies.token;
 
@@ -12,6 +13,16 @@ function authUser(req, res, next) {
     }
 
     const verify = jwt.verify(token, process.env.JWT_SECRET);
+
+    const checkBlockList = await BlockListToken.findOne({
+      token: token,
+    });
+
+    if (checkBlockList) {
+      return res.status(400).json({
+        message: "This token is already Blocked || Access not allowed",
+      });
+    }
 
     req.user = verify;
     next();
@@ -32,6 +43,16 @@ async function authSystemUser(req, res, next) {
       });
     }
     const verify = jwt.verify(token, process.env.JWT_SECRET);
+
+    const checkBlockList = await BlockListToken.findOne({
+      token: token,
+    });
+
+    if (checkBlockList) {
+      return res.status(400).json({
+        message: "This token is already Blocked || Access not allowed",
+      });
+    }
     const findSystemUser = await User.findById(verify.id).select("+systemUser");
     if (!findSystemUser.systemUser) {
       console.log(

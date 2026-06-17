@@ -1,6 +1,7 @@
 import User from "../schema/user.schema.js";
 import jwt from "jsonwebtoken";
 import { SendEmail } from "../services/email.service.js";
+import BlockListToken from "../schema/blocklist.schema.js";
 
 const status = {
   login: "login",
@@ -126,15 +127,33 @@ async function Login(req, res) {
 
 async function Logout(req, res) {
   try {
+    const token = req.cookies.token
+
+    if(!token){
+      return res.status(400).json({
+        "message" : "You have already Logouted"
+      })
+    }
+    const verifyToken = jwt.verify(token , process.env.JWT_SECRET)
+    
+     const block = await BlockListToken.create({
+      token , 
+      user : verifyToken.id
+     })
+
     res.clearCookie("token");
+
     res.status(200).json({
       Message: "Logout Successful",
     });
+
   } catch (error) {
+
     console.log(error);
     res.status(500).json({
       Message: "Internal Server Error",
     });
+
   }
 }
 

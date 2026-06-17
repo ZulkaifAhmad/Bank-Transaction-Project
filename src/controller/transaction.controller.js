@@ -76,15 +76,16 @@ async function createTransaction(req, res) {
     try {
       session.startTransaction();
 
-      const transactionDoc = await Transaction.create(
-        {
-          fromAccount,
-          toAccount,
-          status: "PENDING",
-          amount,
-          idempotencyKey,
-        },
-
+      const [transactionDoc] = await Transaction.create(
+        [
+          {
+            fromAccount,
+            toAccount,
+            status: "PENDING",
+            amount,
+            idempotencyKey,
+          },
+        ],
         { session },
       );
 
@@ -93,13 +94,13 @@ async function createTransaction(req, res) {
           {
             account: toAccount,
             amount,
-            transaction: transactionDoc[0]._id,
+            transaction: transactionDoc._id,
             type: "CREDIT",
           },
           {
             account: fromAccount,
             amount,
-            transaction: transactionDoc[0]._id,
+            transaction: transactionDoc._id,
             type: "DEBIT",
           },
         ],
@@ -165,23 +166,22 @@ async function createInitialFunds(req, res) {
   }
 
   const findFromAccount = await Account.findOne({
-    // systemUser: true,
     user: req.user.id,
   });
 
   if (!findFromAccount) {
-    console.log(findFromAccount)
+    console.log(findFromAccount);
     return res.status(404).json({
       message: "fromAccount or SystemUser Account not found",
     });
   }
 
-  // const existing = await Transaction.findOne({ idempotencyKey });
-  // if (existing) {
-  //   return res.status(400).json({
-  //     message: "Duplicate transaction request",
-  //   });
-  // }
+  const existing = await Transaction.findOne({ idempotencyKey });
+  if (existing) {
+    return res.status(400).json({
+      message: "Duplicate transaction request",
+    });
+  }
 
   const session = await mongoose.startSession();
   try {
